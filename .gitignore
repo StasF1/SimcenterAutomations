@@ -1,0 +1,21 @@
+# git ls-files --others --exclude-from=.git/info/exclude
+# Lines that start with '#' are comments.
+
+# %% Files - anywhere
+*.csv
+*.log
+*.png
+
+#- StarCCM
+*.sim
+
+
+# %% Folders - anywhere
+*.old/
+
+
+# %% Files - local
+
+
+# %% Folders - local
+
