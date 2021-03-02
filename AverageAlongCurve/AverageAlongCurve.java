@@ -64,6 +64,9 @@ public class AverageAlongCurve extends StarMacro {
         orientations.add(new double[] {0.0, 0, 1.0});
         orientations.add(new double[] {0.0, 0, 1.0});
 
+      CreatePlaneSection(simulation, "alongCurveCut", regionOfPipe);
+      CreateSurfaceAverageReport(simulation, "surfaceAverageAlongCurveCut", "alongCurveCut");
+
       for (String field : fieldNames) {
         String pipeCutsCsv = ConvertPipeCutsToCsv(
           CreatePipeCuts(simulation, regionOfPipe, field, origins, orientations)
@@ -87,6 +90,52 @@ public class AverageAlongCurve extends StarMacro {
     boolean dirCreated = pathToCreate.mkdir();
 
     return sessionPathWoExtension + extension;
+  }
+
+  static void CreatePlaneSection(Simulation simulation,
+                                 String presentationName, String regionName) {
+    if (!simulation.getPartManager().has(presentationName)) {
+      PlaneSection planeSection = (PlaneSection) simulation.getPartManager().createImplicitPart(
+        new NeoObjectVector(new Object[] {}),
+        new DoubleVector(new double[] {0.0, 0.0, 1.0}),
+        new DoubleVector(new double[] {0.0, 0.0, 0.0}),
+        0,
+        1,
+        new DoubleVector(new double[] {0.0})
+      );
+
+      Units units = ((Units) simulation.getUnitsManager().getObject("m"));
+
+      planeSection.getOriginCoordinate().setCoordinate(
+        units, units, units,
+        new DoubleVector(new double[] {0.0, 0.0, 0.0})
+      );
+
+      planeSection.getInputParts().setQuery(null);
+      Region region = simulation.getRegionManager().getRegion(regionName);
+      planeSection.getInputParts().setObjects(region);
+      planeSection.setPresentationName(presentationName);
+
+      simulation.println("Created " + presentationName
+                         + " plane section in the region " + regionName);
+    }
+  }
+
+  static void CreateSurfaceAverageReport(Simulation simulation,
+                                         String presentationName, String planeSectionName) {
+    if (!simulation.getReportManager().has(presentationName)) {
+      PlaneSection planeSection = 
+        ((PlaneSection) simulation.getPartManager().getObject(planeSectionName));
+
+      AreaAverageReport areaAverageReport = 
+        simulation.getReportManager().createReport(AreaAverageReport.class);
+      areaAverageReport.getParts().setQuery(null);
+      areaAverageReport.getParts().setObjects(planeSection);
+      areaAverageReport.setPresentationName(presentationName);
+
+      simulation.println("Created " + presentationName
+                         + " surface average report on the plane section " + planeSectionName);
+    }
   }
 
   static void SaveTextToFile(String filename, String text) {
@@ -114,7 +163,6 @@ public class AverageAlongCurve extends StarMacro {
 
     private double[] coordinates_;
     private double value_;
-    private PlaneSection planeSection;
   };
 
   private void EditPlaneSection(Simulation simulation,
