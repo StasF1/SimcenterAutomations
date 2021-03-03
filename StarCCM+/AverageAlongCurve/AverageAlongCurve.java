@@ -47,6 +47,7 @@ public class AverageAlongCurve extends StarMacro {
       List<double[]> origins =
         ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
       Multiply(origins, 0.001); // Convert to metres
+      Print(simulation, origins);
       // Add(origins, new double[] {0.0, 0.0, 0.0}); // Move coordinate system
 
       List<double[]> orientations = Difference(origins);
@@ -93,29 +94,13 @@ public class AverageAlongCurve extends StarMacro {
     return rows;
   }
 
-  // TODO: Create a template for any array type
-  private static void Print(Simulation simulation, double[] array) {
-    boolean isFirst = true;
-    simulation.print("[");
-    for (double element : array) {
-      if (isFirst) {
-        simulation.print(element);
-        isFirst = false;
-      } else {
-        simulation.print(",");
-        simulation.print(element);
-      }
-    }
-    simulation.print("]");
-  }
-
   // TODO: Create a template for a list with any array type
   private static void Print(Simulation simulation, List<double[]> container) {
     simulation.print("{");
     for (int i = 0; i < container.size(); i++) {
-      Print(simulation, container.get(i));
+      simulation.print(Arrays.toString(container.get(i)));
       if (i + 1 != container.size()) {
-        simulation.print(",");
+        simulation.print(", ");
       }
     }
     simulation.print("}\n");
