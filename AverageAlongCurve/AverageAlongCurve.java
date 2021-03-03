@@ -9,10 +9,13 @@
 */
 package macro;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import star.base.neo.*;
@@ -79,11 +82,25 @@ public class AverageAlongCurve extends StarMacro {
     }
   }
 
+  private static List<double[]> ReadNumericCsv(String path) {
+    List<double[]> rows = new ArrayList<double[]>();
+    try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+      String line;
+      while ((line = br.readLine()) != null) {
+        rows.add(
+          Arrays.stream(line.split(",")).mapToDouble(Double::parseDouble).toArray()
+        );
+      }
+    } catch (IOException exception) {
+      System.out.println("Path do not exist --> [" + path + "]");
+    }
+    return rows;
+  }
 
-  static String MkdirFromSimulationName(String sessionPath) {
+  private static String MkdirFromSimulationName(String sessionPath) {
     return MkdirFromSimulationName(sessionPath, "");
   }
-  static String MkdirFromSimulationName(String sessionPath, String extension) {
+  private static String MkdirFromSimulationName(String sessionPath, String extension) {
     String sessionPathWoExtension = sessionPath.substring(0, sessionPath.lastIndexOf('.'));
 
     File pathToCreate = new File(sessionPathWoExtension + extension);
@@ -92,7 +109,7 @@ public class AverageAlongCurve extends StarMacro {
     return sessionPathWoExtension + extension;
   }
 
-  static void CreatePlaneSection(Simulation simulation,
+  private static void CreatePlaneSection(Simulation simulation,
                                  String presentationName, String regionName) {
     if (!simulation.getPartManager().has(presentationName)) {
       PlaneSection planeSection = (PlaneSection) simulation.getPartManager().createImplicitPart(
@@ -121,7 +138,7 @@ public class AverageAlongCurve extends StarMacro {
     }
   }
 
-  static void CreateSurfaceAverageReport(Simulation simulation,
+  private static void CreateSurfaceAverageReport(Simulation simulation,
                                          String presentationName, String planeSectionName) {
     if (!simulation.getReportManager().has(presentationName)) {
       PlaneSection planeSection = 
@@ -138,7 +155,7 @@ public class AverageAlongCurve extends StarMacro {
     }
   }
 
-  static void SaveTextToFile(String filename, String text) {
+  private static void SaveTextToFile(String filename, String text) {
     // simulation.getSessionDirFile();
     try (PrintWriter out = new PrintWriter(filename)) {
       out.println(text);
@@ -146,7 +163,6 @@ public class AverageAlongCurve extends StarMacro {
       System.out.println("Path do not exist --> [" + filename + "]");
     }
   }
-
 
   private class PipeCut {
     public PipeCut(double[] origin, double value) {
