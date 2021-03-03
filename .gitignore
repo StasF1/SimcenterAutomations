@@ -6,6 +6,11 @@
 *.log
 *.png
 
+#- NX
+*.gri
+*.grx
+*.prt
+
 #- StarCCM
 *.sim~
 *.sim
