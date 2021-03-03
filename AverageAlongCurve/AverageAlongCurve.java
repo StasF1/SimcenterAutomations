@@ -46,6 +46,7 @@ public class AverageAlongCurve extends StarMacro {
       List<double[]> origins =
         ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
       List<double[]> orientations = Difference(origins);
+      Print(simulation, origins);
 
       for (String field : fieldNames) {
         String pipeCutsCsv = ConvertPipeCutsToCsv(
@@ -60,15 +61,27 @@ public class AverageAlongCurve extends StarMacro {
   }
 
   /* --------------------------------------- IO helpers ---------------------------------------- */
-
   private static List<double[]> ReadNumericCsv(String path) {
+    return ReadNumericCsv(path, ",", 1);
+  }
+  private static List<double[]> ReadNumericCsv(String path, String delimeter) {
+    return ReadNumericCsv(path, delimeter, 1);
+  }
+  private static List<double[]> ReadNumericCsv(String path, int headerLine) {
+    return ReadNumericCsv(path, ",", headerLine);
+  }
+  private static List<double[]> ReadNumericCsv(String path, String delimeter, int headerLine) {
     List<double[]> rows = new ArrayList<double[]>();
     try (BufferedReader br = new BufferedReader(new FileReader(path))) {
       String line;
+      int lineCounter = 1;
       while ((line = br.readLine()) != null) {
-        rows.add(
-          Arrays.stream(line.split(",")).mapToDouble(Double::parseDouble).toArray()
-        );
+        if (lineCounter > headerLine) {
+          rows.add(
+            Arrays.stream(line.split(delimeter)).mapToDouble(Double::parseDouble).toArray()
+          );
+        }
+        lineCounter++;
       }
     } catch (IOException exception) {
       System.out.println("Path do not exist --> [" + path + "]");
