@@ -43,9 +43,9 @@ public class AverageAlongCurve extends StarMacro {
     String pathToSaveCsv = MkdirFromSimulationName(simulation.getSessionPath(), ".PipeCuts");
 
     {
-      List<double[]> orientations =
+      List<double[]> origins =
         ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
-      List<double[]> origins = Difference(orientations);
+      List<double[]> orientations = Difference(origins);
 
       for (String field : fieldNames) {
         String pipeCutsCsv = ConvertPipeCutsToCsv(
