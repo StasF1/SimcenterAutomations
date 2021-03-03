@@ -1,12 +1,12 @@
-/*
-    API:            Simcenter STAR-CCM+ 15.04.010
-    Project:        https://github.com/StasF1/StarCcmMacros
-    License:        GNU General Public License 3.0 ( see LICENSE )
-    Author:         Stanislav Stashevskii
-
-    Macro:          AverageAlongCurve.java
-    Description:    Avarage parameters along a curve
-*/
+/**
+ *  API:            Simcenter STAR-CCM+ 15.04.010
+ *  Project:        https://github.com/StasF1/StarCcmMacros
+ *  License:        GNU General Public License 3.0 ( see LICENSE )
+ *  Author:         Stanislav Stashevskii
+ *
+ *  Macro:          AverageAlongCurve.java
+ *  Description:    Avarage parameters along a curve
+ */
 package macro;
 
 import java.io.BufferedReader;
@@ -30,7 +30,8 @@ public class AverageAlongCurve extends StarMacro {
 
     String regionOfPipe = "Assembly 1.big_coll";
 
-    String[] fieldNames = new String[] { //FIXME : Post-process only requried field names
+    // FIXME: Post-process only requried fields
+    String[] fieldNames = new String[] {
       "AbsoluteTotalPressure",
       "AbsolutePressure",
       "Density",
@@ -44,9 +45,11 @@ public class AverageAlongCurve extends StarMacro {
 
     {
       List<double[]> origins =
-        ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
+        ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA_mm.csv");
+      Multiply(origins, 0.001); // Convert to metres
+      // Add(origins, new double[] {0.0, 0.0, 0.0}); // Move coordinate system
+
       List<double[]> orientations = Difference(origins);
-      Print(simulation, origins);
 
       for (String field : fieldNames) {
         String pipeCutsCsv = ConvertPipeCutsToCsv(
@@ -61,6 +64,7 @@ public class AverageAlongCurve extends StarMacro {
   }
 
   /* --------------------------------------- IO helpers ---------------------------------------- */
+
   private static List<double[]> ReadNumericCsv(String path) {
     return ReadNumericCsv(path, ",", 1);
   }
@@ -141,24 +145,62 @@ public class AverageAlongCurve extends StarMacro {
 
   /* -------------------------------- List & arrays processing --------------------------------- */
 
-  private static double[] Subtract(double[] lha, double[] rha) {
-    double[] delta = new double[lha.length];
-    for (int i = 0; i < lha.length; i++) {
-      delta[i] = lha[i] - rha[i];
+  private static double[] Add(double[] array, double summand) {
+    for (int i = 0; i < array.length; i++) {
+      array[i] += summand;
     }
-    return delta;
+    return array;
+  }
+  private static double[] Add(double[] array, double[] summand) {
+    for (int i = 0; i < array.length; i++) {
+      array[i] += summand[i];
+    }
+    return array;
+  }
+
+  private static double[] Substract(double[] array, double subtrahend) {
+    return Add(array, -subtrahend);
+  }
+  private static double[] Substract(double[] array, double[] subtrahend) {
+    for (int i = 0; i < array.length; i++) {
+      array[i] -= subtrahend[i];
+    }
+    return array;
+  }
+
+  private static double[] Multiply(double[] array, double multiplier) {
+    for (int i = 0; i < array.length; i++) {
+      array[i] *= multiplier;
+    }
+    return array;
+  }
+  private static double[] Multiply(double[] array, double[] multiplier) {
+    for (int i = 0; i < array.length; i++) {
+      array[i] *= multiplier[i];
+    }
+    return array; 
+  }
+
+  private static List<double[]> Add(List<double[]> container, double[] subtrahend) {
+    for (int i = 0; i < container.size(); i++) {
+      Add(container.get(i), subtrahend);
+    }
+    return container;
+  }
+
+  private static List<double[]> Multiply(List<double[]> container, double multiplier) {
+    for (int i = 0; i < container.size(); i++) {
+      Multiply(container.get(i), multiplier);
+    }
+    return container;
   }
 
   private static List<double[]> Difference(List<double[]> container) {
     List<double[]> diff = new ArrayList<double[]>();
     for (int i = 0; i + 1 < container.size(); i++) {
-      diff.add(
-        Subtract(container.get(i + 1), container.get(i))
-      );
+      diff.add(Substract(container.get(i + 1).clone(), container.get(i)));
     }
-    diff.add(
-      diff.get(diff.size() - 1)
-    );
+    diff.add(diff.get(diff.size() - 1));
     return diff;
   }
 
@@ -236,7 +278,8 @@ public class AverageAlongCurve extends StarMacro {
   }
 
   private static void CreateSurfaceAverageReport(Simulation simulation,
-                                         String presentationName, String planeSectionName) {
+                                                 String presentationName,
+                                                 String planeSectionName) {
     if (!simulation.getReportManager().has(presentationName)) {
       PlaneSection planeSection = 
         ((PlaneSection) simulation.getPartManager().getObject(planeSectionName));
