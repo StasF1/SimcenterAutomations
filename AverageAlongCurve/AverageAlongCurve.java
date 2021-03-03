@@ -43,32 +43,9 @@ public class AverageAlongCurve extends StarMacro {
     String pathToSaveCsv = MkdirFromSimulationName(simulation.getSessionPath(), ".PipeCuts");
 
     {
-      List<double[]> origins = new ArrayList<double[]>();
-        origins.add(new double[] {0.9, 2.9, 6.00});
-        origins.add(new double[] {0.9, 2.9, 7.00});
-        origins.add(new double[] {0.9, 2.9, 8.00});
-        origins.add(new double[] {0.9, 2.9, 9.00});
-        origins.add(new double[] {0.9, 2.9, 10.00});
-        origins.add(new double[] {0.9, 2.9, 11.00});
-        origins.add(new double[] {0.9, 2.9, 12.00});
-        origins.add(new double[] {0.9, 2.9, 13.00});
-        origins.add(new double[] {0.9, 2.9, 14.00});
-        origins.add(new double[] {0.9, 2.9, 15.00});
-
-      List<double[]> orientations = new ArrayList<double[]>();
-        orientations.add(new double[] {0.0, 0, 1.0});
-        orientations.add(new double[] {0.0, 0, 1.0});
-        orientations.add(new double[] {0.0, 0, 1.0});
-        orientations.add(new double[] {0.0, 0, 1.0});
-        orientations.add(new double[] {0.0, 0, 1.0});
-        orientations.add(new double[] {0.0, 0, 1.0});
-        orientations.add(new double[] {0.0, 0, 1.0});
-        orientations.add(new double[] {0.0, 0, 1.0});
-        orientations.add(new double[] {0.0, 0, 1.0});
-        orientations.add(new double[] {0.0, 0, 1.0});
-
-      CreatePlaneSection(simulation, "alongCurveCut", regionOfPipe);
-      CreateSurfaceAverageReport(simulation, "surfaceAverageAlongCurveCut", "alongCurveCut");
+      List<double[]> orientations =
+        ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
+      List<double[]> origins = Difference(orientations);
 
       for (String field : fieldNames) {
         String pipeCutsCsv = ConvertPipeCutsToCsv(
@@ -81,6 +58,8 @@ public class AverageAlongCurve extends StarMacro {
       simulation.println("End");
     }
   }
+
+  /* --------------------------------------- IO helpers ---------------------------------------- */
 
   private static List<double[]> ReadNumericCsv(String path) {
     List<double[]> rows = new ArrayList<double[]>();
@@ -97,6 +76,34 @@ public class AverageAlongCurve extends StarMacro {
     return rows;
   }
 
+  // TODO: Create a template for any array type
+  private static void Print(Simulation simulation, double[] array) {
+    boolean isFirst = true;
+    simulation.print("[");
+    for (double element : array) {
+      if (isFirst) {
+        simulation.print(element);
+        isFirst = false;
+      } else {
+        simulation.print(",");
+        simulation.print(element);
+      }
+    }
+    simulation.print("]");
+  }
+
+  // TODO: Create a template for a list with any array type
+  private static void Print(Simulation simulation, List<double[]> container) {
+    simulation.print("{");
+    for (int i = 0; i < container.size(); i++) {
+      Print(simulation, container.get(i));
+      if (i + 1 != container.size()) {
+        simulation.print(",");
+      }
+    }
+    simulation.print("}\n");
+  }
+
   private static String MkdirFromSimulationName(String sessionPath) {
     return MkdirFromSimulationName(sessionPath, "");
   }
@@ -108,6 +115,59 @@ public class AverageAlongCurve extends StarMacro {
 
     return sessionPathWoExtension + extension;
   }
+
+  private static void SaveTextToFile(String filename, String text) {
+    // simulation.getSessionDirFile();
+    try (PrintWriter out = new PrintWriter(filename)) {
+      out.println(text);
+    } catch (IOException exception) {
+      System.out.println("Path do not exist --> [" + filename + "]");
+    }
+  }
+
+
+  /* -------------------------------- List & arrays processing --------------------------------- */
+
+  private static double[] Subtract(double[] lha, double[] rha) {
+    double[] delta = new double[lha.length];
+    for (int i = 0; i < lha.length; i++) {
+      delta[i] = lha[i] - rha[i];
+    }
+    return delta;
+  }
+
+  private static List<double[]> Difference(List<double[]> container) {
+    List<double[]> diff = new ArrayList<double[]>();
+    for (int i = 0; i + 1 < container.size(); i++) {
+      diff.add(
+        Subtract(container.get(i + 1), container.get(i))
+      );
+    }
+    diff.add(
+      diff.get(diff.size() - 1)
+    );
+    return diff;
+  }
+
+
+  /* ---------------------------------------- StarCCM+ ----------------------------------------- */
+
+  private class PipeCut {
+    public PipeCut(double[] origin, double value) {
+      coordinates_ = origin;
+      value_ = value;
+    }
+
+    public double[] getCoordinates() {
+      return coordinates_;
+    }
+    public double getValue() {
+      return value_;
+    }
+
+    private double[] coordinates_;
+    private double value_;
+  };
 
   private static void CreatePlaneSection(Simulation simulation,
                                  String presentationName, String regionName) {
@@ -138,51 +198,10 @@ public class AverageAlongCurve extends StarMacro {
     }
   }
 
-  private static void CreateSurfaceAverageReport(Simulation simulation,
-                                         String presentationName, String planeSectionName) {
-    if (!simulation.getReportManager().has(presentationName)) {
-      PlaneSection planeSection = 
-        ((PlaneSection) simulation.getPartManager().getObject(planeSectionName));
-
-      AreaAverageReport areaAverageReport = 
-        simulation.getReportManager().createReport(AreaAverageReport.class);
-      areaAverageReport.getParts().setQuery(null);
-      areaAverageReport.getParts().setObjects(planeSection);
-      areaAverageReport.setPresentationName(presentationName);
-
-      simulation.println("Created " + presentationName
-                         + " surface average report on the plane section " + planeSectionName);
-    }
-  }
-
-  private static void SaveTextToFile(String filename, String text) {
-    // simulation.getSessionDirFile();
-    try (PrintWriter out = new PrintWriter(filename)) {
-      out.println(text);
-    } catch (IOException exception) {
-      System.out.println("Path do not exist --> [" + filename + "]");
-    }
-  }
-
-  private class PipeCut {
-    public PipeCut(double[] origin, double value) {
-      coordinates_ = origin;
-      value_ = value;
-    }
-
-    public double[] getCoordinates() {
-      return coordinates_;
-    }
-    public double getValue() {
-      return value_;
-    }
-
-    private double[] coordinates_;
-    private double value_;
-  };
-
   private void EditPlaneSection(Simulation simulation,
                                 String regionOfPipe, double[] origin, double[] orientation) {
+    CreatePlaneSection(simulation, "alongCurveCut", regionOfPipe);
+
     PlaneSection planeSection =
       ((PlaneSection) simulation.getPartManager().getObject("alongCurveCut"));
 
@@ -203,7 +222,26 @@ public class AverageAlongCurve extends StarMacro {
     );
   }
 
+  private static void CreateSurfaceAverageReport(Simulation simulation,
+                                         String presentationName, String planeSectionName) {
+    if (!simulation.getReportManager().has(presentationName)) {
+      PlaneSection planeSection = 
+        ((PlaneSection) simulation.getPartManager().getObject(planeSectionName));
+
+      AreaAverageReport areaAverageReport = 
+        simulation.getReportManager().createReport(AreaAverageReport.class);
+      areaAverageReport.getParts().setQuery(null);
+      areaAverageReport.getParts().setObjects(planeSection);
+      areaAverageReport.setPresentationName(presentationName);
+
+      simulation.println("Created " + presentationName
+                         + " surface average report on the plane section " + planeSectionName);
+    }
+  }
+
   private double GetReportValue(Simulation simulation, String reportName, String fieldName) {
+    CreateSurfaceAverageReport(simulation, reportName, "alongCurveCut");
+
     AreaAverageReport surfaceAveragePipeCutReport =
       ((AreaAverageReport) simulation.getReportManager().getReport(reportName));
 
