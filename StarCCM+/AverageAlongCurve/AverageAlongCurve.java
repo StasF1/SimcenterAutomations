@@ -45,7 +45,7 @@ public class AverageAlongCurve extends StarMacro {
 
     {
       List<double[]> origins =
-        ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA_mm.csv");
+        ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
       Multiply(origins, 0.001); // Convert to metres
       // Add(origins, new double[] {0.0, 0.0, 0.0}); // Move coordinate system
 
