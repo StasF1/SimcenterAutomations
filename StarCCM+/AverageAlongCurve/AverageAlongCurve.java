@@ -17,6 +17,7 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.DoubleStream;
 
 import star.base.neo.*;
 import star.base.report.*;
@@ -45,12 +46,15 @@ public class AverageAlongCurve extends StarMacro {
 
     {
       List<double[]> origins =
-        ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
+        ReadNumericCsv(simulation.getSessionDirFile() + "\\LP_EVA_Riser_pipe.csv");
       Multiply(origins, 0.001); // Convert to metres
-      Print(simulation, origins);
-      // Add(origins, new double[] {0.0, 0.0, 0.0}); // Move coordinate system
 
-      List<double[]> orientations = Difference(origins);
+      List<double[]> orientations = Normalize(Difference(origins));
+
+      simulation.println("\nList of origins:");
+      Print(simulation, origins);
+      simulation.println("\nList of orientations:");
+      Print(simulation, orientations);
 
       for (String field : fieldNames) {
         String pipeCutsCsv = ConvertPipeCutsToCsv(
@@ -58,77 +62,36 @@ public class AverageAlongCurve extends StarMacro {
         );
         SaveTextToFile(pathToSaveCsv + "\\" + field + ".csv", pipeCutsCsv);
 
-        simulation.println(field + " CSV field by the tube length:\n" + pipeCutsCsv);
+        // simulation.println(field + " CSV field by the tube length:\n" + pipeCutsCsv);
       }
       simulation.println("End");
     }
   }
 
-  /* --------------------------------------- IO helpers ---------------------------------------- */
 
-  private static List<double[]> ReadNumericCsv(String path) {
-    return ReadNumericCsv(path, ",", 1);
-  }
-  private static List<double[]> ReadNumericCsv(String path, String delimeter) {
-    return ReadNumericCsv(path, delimeter, 1);
-  }
-  private static List<double[]> ReadNumericCsv(String path, int headerLine) {
-    return ReadNumericCsv(path, ",", headerLine);
-  }
-  private static List<double[]> ReadNumericCsv(String path, String delimeter, int headerLine) {
-    List<double[]> rows = new ArrayList<double[]>();
-    try (BufferedReader br = new BufferedReader(new FileReader(path))) {
-      String line;
-      int lineCounter = 1;
-      while ((line = br.readLine()) != null) {
-        if (lineCounter > headerLine) {
-          rows.add(
-            Arrays.stream(line.split(delimeter)).mapToDouble(Double::parseDouble).toArray()
-          );
-        }
-        lineCounter++;
-      }
-    } catch (IOException exception) {
-      System.out.println("Path do not exist --> [" + path + "]");
+  /* ----------------------------------- Arrays manipulation ----------------------------------- */
+
+  private static double[] Negative(double[] array) {
+    for (int i = 0; i < array.length; i++) {
+      array[i] *= -1.0;
     }
-    return rows;
+    return array;
   }
 
-  // TODO: Create a template for a list with any array type
-  private static void Print(Simulation simulation, List<double[]> container) {
-    simulation.print("{");
+  private static double Magnitude(double[] array) {
+    return Math.sqrt(DoubleStream.of(Multiply(array.clone(), array)).sum());
+  }
+
+  private static double[] Normalize(double[] array) {
+    return Multiply(array, 1.0/Magnitude(array));
+  }
+
+  private static List<double[]> Normalize(List<double[]> container) {
     for (int i = 0; i < container.size(); i++) {
-      simulation.print(Arrays.toString(container.get(i)));
-      if (i + 1 != container.size()) {
-        simulation.print(", ");
-      }
+      Normalize(container.get(i));
     }
-    simulation.print("}\n");
+    return container;
   }
-
-  private static String MkdirFromSimulationName(String sessionPath) {
-    return MkdirFromSimulationName(sessionPath, "");
-  }
-  private static String MkdirFromSimulationName(String sessionPath, String extension) {
-    String sessionPathWoExtension = sessionPath.substring(0, sessionPath.lastIndexOf('.'));
-
-    File pathToCreate = new File(sessionPathWoExtension + extension);
-    boolean dirCreated = pathToCreate.mkdir();
-
-    return sessionPathWoExtension + extension;
-  }
-
-  private static void SaveTextToFile(String filename, String text) {
-    // simulation.getSessionDirFile();
-    try (PrintWriter out = new PrintWriter(filename)) {
-      out.println(text);
-    } catch (IOException exception) {
-      System.out.println("Path do not exist --> [" + filename + "]");
-    }
-  }
-
-
-  /* -------------------------------- List & arrays processing --------------------------------- */
 
   private static double[] Add(double[] array, double summand) {
     for (int i = 0; i < array.length; i++) {
@@ -143,14 +106,11 @@ public class AverageAlongCurve extends StarMacro {
     return array;
   }
 
-  private static double[] Substract(double[] array, double subtrahend) {
-    return Add(array, -subtrahend);
-  }
-  private static double[] Substract(double[] array, double[] subtrahend) {
-    for (int i = 0; i < array.length; i++) {
-      array[i] -= subtrahend[i];
+  private static List<double[]> Add(List<double[]> container, double[] subtrahend) {
+    for (int i = 0; i < container.size(); i++) {
+      Add(container.get(i), subtrahend);
     }
-    return array;
+    return container;
   }
 
   private static double[] Multiply(double[] array, double multiplier) {
@@ -166,13 +126,6 @@ public class AverageAlongCurve extends StarMacro {
     return array; 
   }
 
-  private static List<double[]> Add(List<double[]> container, double[] subtrahend) {
-    for (int i = 0; i < container.size(); i++) {
-      Add(container.get(i), subtrahend);
-    }
-    return container;
-  }
-
   private static List<double[]> Multiply(List<double[]> container, double multiplier) {
     for (int i = 0; i < container.size(); i++) {
       Multiply(container.get(i), multiplier);
@@ -183,7 +136,7 @@ public class AverageAlongCurve extends StarMacro {
   private static List<double[]> Difference(List<double[]> container) {
     List<double[]> diff = new ArrayList<double[]>();
     for (int i = 0; i + 1 < container.size(); i++) {
-      diff.add(Substract(container.get(i + 1).clone(), container.get(i)));
+      diff.add(Add(container.get(i + 1).clone(), Negative(container.get(i).clone())));
     }
     diff.add(diff.get(diff.size() - 1));
     return diff;
@@ -210,7 +163,7 @@ public class AverageAlongCurve extends StarMacro {
   };
 
   private static void CreatePlaneSection(Simulation simulation,
-                                 String presentationName, String regionName) {
+                                         String presentationName, String regionName) {
     if (!simulation.getPartManager().has(presentationName)) {
       PlaneSection planeSection = (PlaneSection) simulation.getPartManager().createImplicitPart(
         new NeoObjectVector(new Object[] {}),
@@ -324,6 +277,65 @@ public class AverageAlongCurve extends StarMacro {
     }
     return pipeCutsCsv;
   }
+
+  /* --------------------------------------- IO helpers ---------------------------------------- */
+
+  private static List<double[]> ReadNumericCsv(String path) {
+    return ReadNumericCsv(path, ",", 1);
+  }
+  private static List<double[]> ReadNumericCsv(String path, String delimeter) {
+    return ReadNumericCsv(path, delimeter, 1);
+  }
+  private static List<double[]> ReadNumericCsv(String path, int headerLine) {
+    return ReadNumericCsv(path, ",", headerLine);
+  }
+  private static List<double[]> ReadNumericCsv(String path, String delimeter, int headerLine) {
+    List<double[]> rows = new ArrayList<double[]>();
+    try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+      String line;
+      int lineCounter = 1;
+      while ((line = br.readLine()) != null) {
+        if (lineCounter > headerLine) {
+          rows.add(
+            Arrays.stream(line.split(delimeter)).mapToDouble(Double::parseDouble).toArray()
+          );
+        }
+        lineCounter++;
+      }
+    } catch (IOException exception) {
+      System.out.println("Path do not exist --> [" + path + "]");
+    }
+    return rows;
+  }
+
+  // TODO: Create a template for a list with any array type
+  private static void Print(Simulation simulation, List<double[]> container) {
+    for (int i = 0; i < container.size(); i++) {
+        simulation.println(String.valueOf(i) + ": " + Arrays.toString(container.get(i)));
+    }
+  }
+
+  private static String MkdirFromSimulationName(String sessionPath) {
+    return MkdirFromSimulationName(sessionPath, "");
+  }
+  private static String MkdirFromSimulationName(String sessionPath, String extension) {
+    String sessionPathWoExtension = sessionPath.substring(0, sessionPath.lastIndexOf('.'));
+
+    File pathToCreate = new File(sessionPathWoExtension + extension);
+    boolean dirCreated = pathToCreate.mkdir();
+
+    return sessionPathWoExtension + extension;
+  }
+
+  private static void SaveTextToFile(String filename, String text) {
+    // simulation.getSessionDirFile();
+    try (PrintWriter out = new PrintWriter(filename)) {
+      out.println(text);
+    } catch (IOException exception) {
+      System.out.println("Path do not exist --> [" + filename + "]");
+    }
+  }
+
 }
 
 /* (C) 2021 Stanislav Stasheuskii */
