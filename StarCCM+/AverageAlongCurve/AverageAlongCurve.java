@@ -46,7 +46,7 @@ public class AverageAlongCurve extends StarMacro {
 
     {
       List<double[]> origins =
-        ReadNumericCsv(simulation.getSessionDirFile() + "\\LP_EVA_Riser_pipe.csv");
+        ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
       Multiply(origins, 0.001); // Convert to metres
 
       List<double[]> orientations = Normalize(Difference(origins));
@@ -162,7 +162,8 @@ public class AverageAlongCurve extends StarMacro {
     private double value_;
   };
 
-  private void CreateCylindricalCoordinateSystem(Simulation simulation, String presentationName) {
+  private CylindricalCoordinateSystem CreateCylindricalCoordinateSystem(Simulation simulation,
+                                                                        String presentationName) {
     LabCoordinateSystem labCoordinateSystem = 
       simulation.getCoordinateSystemManager().getLabCoordinateSystem();
 
@@ -192,19 +193,40 @@ public class AverageAlongCurve extends StarMacro {
         new DoubleVector(new double[] {0.0, 0.0, 0.0})
       );
       cylindricalCoordinateSystem.setBasis0(
-        new DoubleVector(new double[] {0.7071067811865475, -0.7071067811865475, 0.0})
+        new DoubleVector(new double[] {1.0, 0.0, 0.0})
       );
       cylindricalCoordinateSystem.setBasis1(
-        new DoubleVector(new double[] {0.4082482904638631, 0.4082482904638631, -0.8164965809277261})
+        new DoubleVector(new double[] {0.0, 1.0, 0.0})
       );
 
-      cylindricalCoordinateSystem.setPresentationName("pipeCylindrical");
+      cylindricalCoordinateSystem.setPresentationName(presentationName);
+      return cylindricalCoordinateSystem;
+    } else {
+      return ((CylindricalCoordinateSystem) labCoordinateSystem.getLocalCoordinateSystemManager()
+                                                               .getObject(presentationName));
     }
   }
 
+  private void EditCylindricalCoordinateSystem(Simulation simulation,
+                                                double[] origin,
+                                                double[] radialAxis, double[] tangentialAxis) {
+    CylindricalCoordinateSystem cylindricalCoordinateSystem = CreateCylindricalCoordinateSystem(
+      simulation,
+      "pipeCylindrical"
+    );
 
-  private void CreatePlaneSection(Simulation simulation,
-                                         String presentationName, String regionName) {
+    Units units = ((Units) simulation.getUnitsManager().getObject("m"));
+    cylindricalCoordinateSystem.getOrigin().setCoordinate(
+      units, units, units,
+      new DoubleVector(origin)
+    );
+
+    cylindricalCoordinateSystem.setBasis0(new DoubleVector(radialAxis));
+    cylindricalCoordinateSystem.setBasis1(new DoubleVector(tangentialAxis));
+  }
+
+  private PlaneSection CreatePlaneSection(Simulation simulation,
+                                          String presentationName, String regionName) {
     if (!simulation.getPartManager().has(presentationName)) {
       PlaneSection planeSection = (PlaneSection) simulation.getPartManager().createImplicitPart(
         new NeoObjectVector(new Object[] {}),
@@ -227,17 +249,15 @@ public class AverageAlongCurve extends StarMacro {
       planeSection.getInputParts().setObjects(region);
       planeSection.setPresentationName(presentationName);
 
-      simulation.println("Created " + presentationName
-                         + " plane section in the region " + regionName);
+      return planeSection;
+    } else {
+      return ((PlaneSection) simulation.getPartManager().getObject(presentationName));
     }
   }
 
   private void EditPlaneSection(Simulation simulation,
                                 String regionOfPipe, double[] origin, double[] orientation) {
-    CreatePlaneSection(simulation, "alongCurveCut", regionOfPipe);
-
-    PlaneSection planeSection =
-      ((PlaneSection) simulation.getPartManager().getObject("alongCurveCut"));
+    PlaneSection planeSection = CreatePlaneSection(simulation, "alongCurveCut", regionOfPipe);
 
     Units units = ((Units) simulation.getUnitsManager().getObject("m"));
 
