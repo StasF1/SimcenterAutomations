@@ -162,7 +162,48 @@ public class AverageAlongCurve extends StarMacro {
     private double value_;
   };
 
-  private static void CreatePlaneSection(Simulation simulation,
+  private void CreateCylindricalCoordinateSystem(Simulation simulation, String presentationName) {
+    LabCoordinateSystem labCoordinateSystem = 
+      simulation.getCoordinateSystemManager().getLabCoordinateSystem();
+
+    if (!labCoordinateSystem.getLocalCoordinateSystemManager().has(presentationName)) {
+      Units units = simulation.getUnitsManager().getPreferredUnits(
+        new IntVector(
+          new int[] {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+        )
+      );
+
+      CylindricalCoordinateSystem cylindricalCoordinateSystem = 
+        labCoordinateSystem.getLocalCoordinateSystemManager().createLocalCoordinateSystem(
+          CylindricalCoordinateSystem.class, "Cylindrical"
+        );
+
+      cylindricalCoordinateSystem.getOrigin().setCoordinate(
+        units, units, units,
+        new DoubleVector(new double[] {0.0, 0.0, 0.0})
+      );
+      cylindricalCoordinateSystem.getOrigin().setUnits0(units);
+      cylindricalCoordinateSystem.getOrigin().setUnits1(units);
+      cylindricalCoordinateSystem.getOrigin().setUnits2(units);
+
+      cylindricalCoordinateSystem.getOrigin().setDefinition("");
+
+      cylindricalCoordinateSystem.getOrigin().setValue(
+        new DoubleVector(new double[] {0.0, 0.0, 0.0})
+      );
+      cylindricalCoordinateSystem.setBasis0(
+        new DoubleVector(new double[] {0.7071067811865475, -0.7071067811865475, 0.0})
+      );
+      cylindricalCoordinateSystem.setBasis1(
+        new DoubleVector(new double[] {0.4082482904638631, 0.4082482904638631, -0.8164965809277261})
+      );
+
+      cylindricalCoordinateSystem.setPresentationName("pipeCylindrical");
+    }
+  }
+
+
+  private void CreatePlaneSection(Simulation simulation,
                                          String presentationName, String regionName) {
     if (!simulation.getPartManager().has(presentationName)) {
       PlaneSection planeSection = (PlaneSection) simulation.getPartManager().createImplicitPart(
@@ -215,7 +256,7 @@ public class AverageAlongCurve extends StarMacro {
     );
   }
 
-  private static void CreateSurfaceAverageReport(Simulation simulation,
+  private void CreateSurfaceAverageReport(Simulation simulation,
                                                  String presentationName,
                                                  String planeSectionName) {
     if (!simulation.getReportManager().has(presentationName)) {
