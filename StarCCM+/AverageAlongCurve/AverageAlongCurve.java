@@ -31,15 +31,11 @@ public class AverageAlongCurve extends StarMacro {
 
     String regionOfPipe = "Assembly 1.big_coll";
 
-    // FIXME: Post-process only requried fields
     String[] fieldNames = new String[] {
       "AbsoluteTotalPressure",
-      "AbsolutePressure",
-      "Density",
-      "DynamicViscosity",
-      "MassFlux",
-      "Temperature",
-      "TotalTemperature"
+      // "AbsolutePressure",
+      // "Temperature",
+      // "TotalTemperature"
     };
 
     String pathToSaveCsv = MkdirFromSimulationName(simulation.getSessionPath(), ".PipeCuts");
@@ -49,16 +45,16 @@ public class AverageAlongCurve extends StarMacro {
         ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
       Multiply(origins, 0.001); // Convert to metres
 
-      List<double[]> orientations = Normalize(Difference(origins));
+      List<double[]> normals = Normalize(Difference(origins));
 
       simulation.println("\nList of origins:");
       Print(simulation, origins);
-      simulation.println("\nList of orientations:");
-      Print(simulation, orientations);
+      simulation.println("\nList of normals:");
+      Print(simulation, normals);
 
       for (String field : fieldNames) {
         String pipeCutsCsv = ConvertPipeCutsToCsv(
-          CreatePipeCuts(simulation, regionOfPipe, field, origins, orientations)
+          CreatePipeCuts(simulation, regionOfPipe, field, origins, normals)
         );
         SaveTextToFile(pathToSaveCsv + "\\" + field + ".csv", pipeCutsCsv);
 
@@ -256,7 +252,7 @@ public class AverageAlongCurve extends StarMacro {
   }
 
   private void EditPlaneSection(Simulation simulation,
-                                String regionOfPipe, double[] origin, double[] orientation) {
+                                String regionOfPipe, double[] origin, double[] normal) {
     PlaneSection planeSection = CreatePlaneSection(simulation, "alongCurveCut", regionOfPipe);
 
     Units units = ((Units) simulation.getUnitsManager().getObject("m"));
@@ -267,7 +263,7 @@ public class AverageAlongCurve extends StarMacro {
     );
     planeSection.getOrientationCoordinate().setCoordinate(
       units, units, units,
-      new DoubleVector(orientation)
+      new DoubleVector(normal)
     );
 
     planeSection.getInputParts().setQuery(null);
@@ -309,18 +305,17 @@ public class AverageAlongCurve extends StarMacro {
 
   private List<PipeCut> CreatePipeCuts(Simulation simulation,
                                        String regionOfPipe, String fieldName,
-                                       List<double[]> origins, List<double[]> orientations) {
+                                       List<double[]> origins, List<double[]> normals) {
     List<PipeCut> pipeCuts = new ArrayList<PipeCut>();
 
-    for (int i = 0; i < orientations.size(); i++) {
+    for (int i = 0; i < normals.size(); i++) {
       double[] origin = origins.get(i);
-      double[] orientation = orientations.get(i);
+      double[] normal = normals.get(i);
 
-      EditPlaneSection(simulation, regionOfPipe, origin, orientation);
-      pipeCuts.add(new PipeCut(
-        origin,
-        GetReportValue(simulation, "surfaceAverageAlongCurveCut", fieldName)
-      ));
+      EditPlaneSection(simulation, regionOfPipe, origin, normal);
+      pipeCuts.add( // FIXME: Get report value for magmitude of a vactor field
+        new PipeCut(origin, GetReportValue(simulation, "surfaceAverageAlongCurveCut", fieldName))
+      );
     }
     return pipeCuts;
   }
