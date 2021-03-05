@@ -1,9 +1,9 @@
 /**
  *  API:            Simcenter STAR-CCM+ 15.04.010
- *  Project:        https://github.com/StasF1/StarCcmMacros
+ *  Project:        https://github.com/StasF1/SimcenterAutomations
  *  License:        GNU General Public License 3.0 ( see LICENSE )
  *  Author:         Stanislav Stashevskii
- *
+ *  
  *  Macro:          AverageAlongCurve.java
  *  Description:    Avarage parameters along a curve
  */
@@ -29,41 +29,57 @@ public class AverageAlongCurve extends StarMacro {
   public void execute() {
     Simulation simulation = getActiveSimulation();
 
-    String regionOfPipe = "Assembly 1.big_coll";
+    String side = "L";
+    String zone = "D";
+    String pipeName = "In";
+    int regime = 60;
 
+    // FIXME: Process a vector fields magnitude
     String[] fieldNames = new String[] {
-      "AbsoluteTotalPressure",
-      // "AbsolutePressure",
-      // "Temperature",
-      // "TotalTemperature"
+      "AbsoluteTotalPressure"
     };
 
-    String pathToSaveCsv = MkdirFromSimulationName(simulation.getSessionPath(), ".PipeCuts");
+    String pipeDataPath = (
+      simulation.getSessionDirFile() + "\\..\\..\\pipes.data\\"
+      + side + "\\" + zone + "\\" + pipeName
+    );
 
+    // String pathToSaveCsv = MkdirFromSimulationName(simulation.getSessionPath(), ".data");
+    String pathToSaveCsv = pipeDataPath + "\\Loads\\" + String.valueOf(regime);
     {
-      List<double[]> origins =
-        ReadNumericCsv(simulation.getSessionDirFile() + "\\TEST_DATA.csv");
-      Multiply(origins, 0.001); // Convert to metres
-
-      List<double[]> normals = Normalize(Difference(origins));
-
-      simulation.println("\nList of origins:");
-      Print(simulation, origins);
-      simulation.println("\nList of normals:");
-      Print(simulation, normals);
-
-      for (String field : fieldNames) {
-        String pipeCutsCsv = ConvertPipeCutsToCsv(
-          CreatePipeCuts(simulation, regionOfPipe, field, origins, normals)
-        );
-        SaveTextToFile(pathToSaveCsv + "\\" + field + ".csv", pipeCutsCsv);
-
-        // simulation.println(field + " CSV field by the tube length:\n" + pipeCutsCsv);
-      }
-      simulation.println("End");
+      File pathToCreate = new File(pathToSaveCsv);
+      pathToCreate.mkdir();
     }
+
+    AverageAlongCurve_(simulation, pipeDataPath, pathToSaveCsv, fieldNames);
   }
 
+  private void AverageAlongCurve_(Simulation simulation,
+                                  String pipeDataPath, String pathToSaveCsv,
+                                  String[] fieldNames) {
+    String regionName = "Assembly 1.big_coll";
+
+    List<double[]> origins = ReadNumericCsv(pipeDataPath + "\\origins.csv");
+    Multiply(origins, 0.001); // Convert to metres
+
+    List<double[]> normals = Normalize(Difference(origins));
+
+    simulation.println("\nList of origins:");
+    Print(simulation, origins);
+    simulation.println("\nList of normals:");
+    Print(simulation, normals);
+    simulation.println("");
+
+    for (String field : fieldNames) {
+      String pipeCutsCsv = ConvertPipeCutsToCsv(
+        CreatePipeCuts(simulation, regionName, field, origins, normals)
+      );
+      SaveTextToFile(pathToSaveCsv + "\\" + field + ".csv", pipeCutsCsv);
+
+      simulation.println(field + " CSV field by the tube length:\n" + pipeCutsCsv);
+    }
+    simulation.println("End");
+  }
 
   /* ----------------------------------- Arrays manipulation ----------------------------------- */
 
@@ -120,6 +136,32 @@ public class AverageAlongCurve extends StarMacro {
       array[i] *= multiplier[i];
     }
     return array; 
+  }
+
+  private static double[] DotProduct(double[] a, double[] b) {
+    double[] product = new double[3];
+    product[0] = a[1]*b[2] - a[2]*b[1];
+    product[1] = a[2]*b[0] - a[0]*b[2];
+    product[2] = a[0]*b[1] - a[1]*b[0];
+    return product;
+  }
+
+  private static double[][] CreateRightHandNormals(double[] k) {
+    double[] i = new double[k.length];
+    double[] j = new double[k.length];
+    double[] kDescartes = new double[] {0.0, 0.0, 1.0};
+
+    if (Arrays.equals(k, kDescartes)) {
+      i = new double[] {1.0, 0.0, 0.0};
+      j = new double[] {0.0, 1.0, 0.0};
+    } else {
+      i = DotProduct(k, kDescartes);
+      j = DotProduct(k, i);
+      Normalize(i);
+      Normalize(j);
+    }
+
+    return new double[][] {i, j, k};
   }
 
   private static List<double[]> Multiply(List<double[]> container, double multiplier) {
@@ -204,8 +246,8 @@ public class AverageAlongCurve extends StarMacro {
   }
 
   private void EditCylindricalCoordinateSystem(Simulation simulation,
-                                                double[] origin,
-                                                double[] radialAxis, double[] tangentialAxis) {
+                                               double[] origin,
+                                               double[] normal) {
     CylindricalCoordinateSystem cylindricalCoordinateSystem = CreateCylindricalCoordinateSystem(
       simulation,
       "pipeCylindrical"
@@ -217,8 +259,55 @@ public class AverageAlongCurve extends StarMacro {
       new DoubleVector(origin)
     );
 
-    cylindricalCoordinateSystem.setBasis0(new DoubleVector(radialAxis));
-    cylindricalCoordinateSystem.setBasis1(new DoubleVector(tangentialAxis));
+    double[][] axes = CreateRightHandNormals(normal);
+    cylindricalCoordinateSystem.setBasis0(new DoubleVector(axes[0]));
+    cylindricalCoordinateSystem.setBasis1(new DoubleVector(axes[1]));
+  }
+
+  private ThresholdPart EditPipeThreshold(Simulation simulation,
+                                          String regionName,
+                                          String presentationName,
+                                          double radius) {
+    if (!simulation.getPartManager().has(presentationName)) {
+      LabCoordinateSystem labCoordinateSystem = 
+        simulation.getCoordinateSystemManager().getLabCoordinateSystem();
+
+      CylindricalCoordinateSystem cylindricalCoordinateSystem = 
+        ((CylindricalCoordinateSystem) labCoordinateSystem.getLocalCoordinateSystemManager()
+                                                          .getObject("pipeCylindrical"));
+
+      Units units = simulation.getUnitsManager().getPreferredUnits(new IntVector(
+          new int[] {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+      ));
+
+      Region region = simulation.getRegionManager().getRegion(regionName);
+
+      PrimitiveFieldFunction primitiveFieldFunction = 
+        ((PrimitiveFieldFunction) simulation.getFieldFunctionManager().getFunction("Centroid"));
+
+      VectorComponentFieldFunction vectorComponentFieldFunction = 
+        (
+          (VectorComponentFieldFunction)
+          primitiveFieldFunction.getFunctionInCoordinateSystem(cylindricalCoordinateSystem)
+                                .getComponentFunction(0)
+        );
+
+      ThresholdPart thresholdPart = simulation.getPartManager().createThresholdPart(
+        new NeoObjectVector(new Object[] {region}),
+        new DoubleVector(new double[] {0.0, radius}),
+        units,
+        vectorComponentFieldFunction,
+        0
+      );
+      thresholdPart.setPresentationName(presentationName);
+      return thresholdPart;
+    } else {
+      ThresholdPart thresholdPart = 
+        ((ThresholdPart) simulation.getPartManager().getObject(presentationName));
+
+      thresholdPart.getRangeQuantities().setArray(new DoubleVector(new double[] {0.0, radius}));
+      return thresholdPart;
+    }
   }
 
   private PlaneSection CreatePlaneSection(Simulation simulation,
@@ -251,9 +340,10 @@ public class AverageAlongCurve extends StarMacro {
     }
   }
 
-  private void EditPlaneSection(Simulation simulation,
-                                String regionOfPipe, double[] origin, double[] normal) {
-    PlaneSection planeSection = CreatePlaneSection(simulation, "alongCurveCut", regionOfPipe);
+  private PlaneSection EditPlaneSection(Simulation simulation,
+                                        String regionName,
+                                        double[] origin, double[] normal) {
+    PlaneSection planeSection = CreatePlaneSection(simulation, "alongCurveCut", regionName);
 
     Units units = ((Units) simulation.getUnitsManager().getObject("m"));
 
@@ -268,13 +358,23 @@ public class AverageAlongCurve extends StarMacro {
 
     planeSection.getInputParts().setQuery(null);
     planeSection.getInputParts().setObjects(
-      simulation.getRegionManager().getRegion(regionOfPipe)
+      simulation.getRegionManager().getRegion(regionName)
     );
+    return planeSection;
   }
 
-  private void CreateSurfaceAverageReport(Simulation simulation,
-                                                 String presentationName,
-                                                 String planeSectionName) {
+  private void EditPlaneSection(Simulation simulation,
+                                String regionName,
+                                ThresholdPart thresholdPart,
+                                double[] origin, double[] normal) {
+    PlaneSection planeSection = EditPlaneSection(simulation, regionName, origin, normal);
+
+    planeSection.getInputParts().setObjects(thresholdPart);
+  }
+
+  private AreaAverageReport CreateSurfaceAverageReport(Simulation simulation,
+                                                       String presentationName,
+                                                       String planeSectionName) {
     if (!simulation.getReportManager().has(presentationName)) {
       PlaneSection planeSection = 
         ((PlaneSection) simulation.getPartManager().getObject(planeSectionName));
@@ -284,17 +384,15 @@ public class AverageAlongCurve extends StarMacro {
       areaAverageReport.getParts().setQuery(null);
       areaAverageReport.getParts().setObjects(planeSection);
       areaAverageReport.setPresentationName(presentationName);
-
-      simulation.println("Created " + presentationName
-                         + " surface average report on the plane section " + planeSectionName);
+      return areaAverageReport;
+    } else {
+      return ((AreaAverageReport) simulation.getReportManager().getReport(presentationName));
     }
   }
 
   private double GetReportValue(Simulation simulation, String reportName, String fieldName) {
-    CreateSurfaceAverageReport(simulation, reportName, "alongCurveCut");
-
     AreaAverageReport surfaceAveragePipeCutReport =
-      ((AreaAverageReport) simulation.getReportManager().getReport(reportName));
+      CreateSurfaceAverageReport(simulation, reportName, "alongCurveCut");
 
     PrimitiveFieldFunction field =
       ((PrimitiveFieldFunction) simulation.getFieldFunctionManager().getFunction(fieldName));
@@ -304,7 +402,7 @@ public class AverageAlongCurve extends StarMacro {
   }
 
   private List<PipeCut> CreatePipeCuts(Simulation simulation,
-                                       String regionOfPipe, String fieldName,
+                                       String regionName, String fieldName,
                                        List<double[]> origins, List<double[]> normals) {
     List<PipeCut> pipeCuts = new ArrayList<PipeCut>();
 
@@ -312,10 +410,17 @@ public class AverageAlongCurve extends StarMacro {
       double[] origin = origins.get(i);
       double[] normal = normals.get(i);
 
-      EditPlaneSection(simulation, regionOfPipe, origin, normal);
-      pipeCuts.add( // FIXME: Get report value for magmitude of a vactor field
-        new PipeCut(origin, GetReportValue(simulation, "surfaceAverageAlongCurveCut", fieldName))
+      EditCylindricalCoordinateSystem(simulation, origin, normal);
+      EditPlaneSection(
+        simulation,
+        regionName, EditPipeThreshold(simulation, regionName, "pipeThreshold", 0.15),
+        origin, normal
       );
+
+      pipeCuts.add(new PipeCut(
+          origin,
+          GetReportValue(simulation, "surfaceAverageAlongCurveCut", fieldName)
+      ));
     }
     return pipeCuts;
   }
